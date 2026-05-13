@@ -1,0 +1,29 @@
+{
+  "llm": {
+    "apiKey": "",
+    "baseUrl": "https://api.deepseek.com",
+    "modelName": "deepseek-v4-flash",
+    "systemPrompt": "你是一个基于本地知识库的智能助手，请根据提供的文档内容回答用户问题。如果文档中没有相关信息，请如实告知。",
+    "temperature": 0.7,
+    "maxTokens": 4096,
+    "timeoutSeconds": 120
+  },
+  "retrieval": {
+    "maxResults": 3,
+    "minScore": 0.5
+  },
+  "document": {
+    "dir": "./documents",
+    "chunkSize": 300,
+    "chunkOverlap": 0
+  },
+  "chat": {
+    "memorySize": 10
+  },
+  "server": {
+    "port": 8080
+  },
+  "store": {
+    "filePath": "./data/embedding-store.json"
+  }
+}
