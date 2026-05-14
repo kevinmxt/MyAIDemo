@@ -15,7 +15,8 @@
   "document": {
     "dir": "./documents",
     "chunkSize": 300,
-    "chunkOverlap": 0
+    "chunkOverlap": 0,
+    "supportedExtensions": [".txt", ".pdf", ".docx", ".doc", ".png", ".jpg", ".jpeg", ".md", ".html", ".csv", ".json", ".xlsx", ".pptx"]
   },
   "chat": {
     "memorySize": 10

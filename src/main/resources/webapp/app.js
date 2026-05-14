@@ -3,17 +3,40 @@ const chatMessages = document.getElementById('chatMessages');
 const chatInput = document.getElementById('chatInput');
 const sendBtn = document.getElementById('sendBtn');
 const ingestBtn = document.getElementById('ingestBtn');
+const browseBtn = document.getElementById('browseBtn');
 const ingestDir = document.getElementById('ingestDir');
 const ingestStatus = document.getElementById('ingestStatus');
 const documentList = document.getElementById('documentList');
 const storeStatus = document.getElementById('storeStatus');
+const supportedFormats = document.getElementById('supportedFormats');
+
+// Browse modal elements
+const browseModal = document.getElementById('browseModal');
+const browseBreadcrumb = document.getElementById('browseBreadcrumb');
+const browseDirList = document.getElementById('browseDirList');
+const browseManualPath = document.getElementById('browseManualPath');
+const browseConfirmBtn = document.getElementById('browseConfirmBtn');
 
 let isWaiting = false;
+let browseCurrentPath = '';
+let browseParentPath = null;
+
+// Supported file extensions (synced with server defaults)
+const DEFAULT_SUPPORTED_EXTENSIONS = [
+    '.txt', '.pdf', '.docx', '.doc', '.png', '.jpg', '.jpeg',
+    '.md', '.html', '.csv', '.json', '.xlsx', '.pptx'
+];
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     refreshDocuments();
+    showSupportedFormats();
 });
+
+// Display supported formats hint
+function showSupportedFormats() {
+    supportedFormats.textContent = '支持格式：' + DEFAULT_SUPPORTED_EXTENSIONS.join(', ');
+}
 
 // Handle Enter key (send on Enter, newline on Shift+Enter)
 function handleKeyDown(event) {
@@ -159,6 +182,7 @@ async function ingestDocuments() {
     }
 
     ingestBtn.disabled = true;
+    browseBtn.disabled = true;
     showIngestStatus('正在摄入文档...', 'loading');
 
     try {
@@ -180,6 +204,7 @@ async function ingestDocuments() {
         showIngestStatus('请求失败：' + error.message, 'error');
     } finally {
         ingestBtn.disabled = false;
+        browseBtn.disabled = false;
     }
 }
 
@@ -207,7 +232,11 @@ async function refreshDocuments() {
                 totalSegments += doc.segmentCount;
                 html += '<div class="doc-item">';
                 html += '<div class="doc-name">' + escapeHtml(doc.fileName) + '</div>';
-                html += '<div class="doc-meta">' + doc.segmentCount + ' 个片段</div>';
+                html += '<div class="doc-meta">' + doc.segmentCount + ' 个片段';
+                if (doc.fileType) {
+                    html += ' · ' + escapeHtml(doc.fileType);
+                }
+                html += '</div>';
                 if (doc.directory) {
                     html += '<div class="doc-meta">' + escapeHtml(doc.directory) + '</div>';
                 }
@@ -224,4 +253,162 @@ async function refreshDocuments() {
 
 function scrollToBottom() {
     chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// ==================== Directory Browser ====================
+
+/**
+ * Open the directory browser modal and load the initial directory.
+ */
+async function openBrowser() {
+    browseModal.style.display = 'flex';
+    // Start from the current input value, or root
+    const currentInput = ingestDir.value.trim();
+    if (currentInput) {
+        await navigateTo(currentInput);
+    } else {
+        await navigateTo('');
+    }
+}
+
+/**
+ * Close the directory browser modal.
+ */
+function closeBrowser() {
+    browseModal.style.display = 'none';
+}
+
+/**
+ * Navigate to a specific directory path.
+ */
+async function navigateTo(dirPath) {
+    browseDirList.innerHTML = '<div class="empty-state">加载中...</div>';
+    browseCurrentPath = dirPath;
+
+    try {
+        const response = await fetch('/api/browse', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: dirPath })
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            browseDirList.innerHTML = '<div class="empty-state">错误：' + escapeHtml(err.error || '请求失败') + '</div>';
+            return;
+        }
+
+        const data = await response.json();
+        browseCurrentPath = data.currentPath;
+        browseParentPath = data.parentPath;
+
+        renderBreadcrumb(data.currentPath, data.parentPath);
+        renderDirectoryList(data.directories, data.currentPath);
+        browseManualPath.value = data.currentPath || '';
+        browseConfirmBtn.textContent = data.currentPath ? '选择当前目录' : '选择根目录';
+    } catch (error) {
+        browseDirList.innerHTML = '<div class="empty-state">请求失败：' + escapeHtml(error.message) + '</div>';
+    }
+}
+
+/**
+ * Render breadcrumb navigation from a path.
+ */
+function renderBreadcrumb(currentPath, parentPath) {
+    let html = '';
+
+    if (currentPath) {
+        // Split path into parts for breadcrumb
+        const parts = currentPath.replace(/\\/g, '/').split('/').filter(p => p);
+        if (parts.length === 0) {
+            // It's a root drive like "C:"
+            html += '<span class="breadcrumb-item" onclick="navigateTo(\'\')">根目录</span>';
+            html += '<span class="breadcrumb-separator">/</span>';
+            html += '<span class="breadcrumb-current">' + escapeHtml(currentPath) + '</span>';
+        } else {
+            // Build breadcrumb with clickable segments
+            let accumulatedPath = '';
+            html += '<span class="breadcrumb-item" onclick="navigateTo(\'\')">根目录</span>';
+
+            for (let i = 0; i < parts.length; i++) {
+                html += '<span class="breadcrumb-separator">/</span>';
+                // On Windows, first part might be "C:"
+                if (i === 0 && parts[i].includes(':')) {
+                    accumulatedPath = parts[i] + '/';
+                } else {
+                    accumulatedPath += '/' + parts[i];
+                }
+
+                if (i === parts.length - 1) {
+                    html += '<span class="breadcrumb-current">' + escapeHtml(parts[i]) + '</span>';
+                } else {
+                    html += '<span class="breadcrumb-item" onclick="navigateTo(\'' +
+                        escapeAttr(accumulatedPath) + '\')">' + escapeHtml(parts[i]) + '</span>';
+                }
+            }
+        }
+    } else {
+        html += '<span class="breadcrumb-current">根目录</span>';
+    }
+
+    browseBreadcrumb.innerHTML = html;
+}
+
+/**
+ * Render the directory list.
+ */
+function renderDirectoryList(directories, currentPath) {
+    if (!directories || directories.length === 0) {
+        browseDirList.innerHTML = '<div class="empty-state">此目录下没有子目录</div>';
+        return;
+    }
+
+    let html = '';
+    directories.forEach(dir => {
+        const dirName = dir.replace(/\\/g, '/').split('/').pop() || dir;
+        html += '<div class="dir-item" ondblclick="navigateTo(\'' + escapeAttr(dir) + '\')" onclick="selectBrowseDir(\'' + escapeAttr(dir) + '\')">';
+        html += '<span class="dir-icon">📁</span>';
+        html += '<span class="dir-name">' + escapeHtml(dirName) + '</span>';
+        html += '</div>';
+    });
+    browseDirList.innerHTML = html;
+}
+
+/**
+ * Select a directory by clicking (highlight it and update manual input).
+ */
+function selectBrowseDir(dirPath) {
+    browseManualPath.value = dirPath;
+    // Highlight selected item
+    document.querySelectorAll('.dir-item').forEach(item => item.style.background = '');
+    event.currentTarget.style.background = '#dbeafe';
+}
+
+/**
+ * Confirm and use the currently browsed directory.
+ */
+function selectCurrentDir() {
+    const path = browseCurrentPath || browseManualPath.value.trim();
+    if (path) {
+        ingestDir.value = path;
+    }
+    closeBrowser();
+}
+
+/**
+ * Use the manually entered path.
+ */
+function selectManualPath() {
+    const path = browseManualPath.value.trim();
+    if (path) {
+        ingestDir.value = path;
+    }
+    closeBrowser();
+}
+
+/**
+ * Escape a string for use in HTML attribute values.
+ */
+function escapeAttr(str) {
+    return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
 }

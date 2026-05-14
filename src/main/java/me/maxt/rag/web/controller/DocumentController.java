@@ -11,6 +11,11 @@ import java.io.File;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * 文档管理控制器，处理文档摄入、浏览和列表相关的 HTTP 请求。
+ *
+ * @since 1.0
+ */
 public class DocumentController {
 
     private static final Logger log = LoggerFactory.getLogger(DocumentController.class);
@@ -19,11 +24,21 @@ public class DocumentController {
     private final DocumentService documentService;
     private final EmbeddingStoreManager storeManager;
 
+    /**
+     * @param documentService 文档摄入服务
+     * @param storeManager    嵌入存储管理器
+     */
     public DocumentController(DocumentService documentService, EmbeddingStoreManager storeManager) {
         this.documentService = documentService;
         this.storeManager = storeManager;
     }
 
+    /**
+     * 处理文档摄入请求。
+     *
+     * <p>请求格式：{@code POST /api/ingest}，Body: {@code {"directory": "/path/to/docs"}}</p>
+     * <p>响应格式：{@code {"success": true, "filesProcessed": 3, "segmentsCreated": 45, "message": "..."}}</p>
+     */
     public void handleIngest(Context ctx) {
         try {
             @SuppressWarnings("unchecked")
@@ -47,6 +62,12 @@ public class DocumentController {
         }
     }
 
+    /**
+     * 处理文档列表查询请求。
+     *
+     * <p>请求格式：{@code GET /api/documents}</p>
+     * <p>响应格式：JSON 数组，每个元素包含 {@code fileName}、{@code segmentCount}、{@code directory}</p>
+     */
     public void handleListDocuments(Context ctx) {
         try {
             List<EmbeddingStoreManager.StoredEntry> entries = storeManager.listDocuments();
@@ -65,10 +86,13 @@ public class DocumentController {
                 doc.put("fileName", group.getKey());
                 doc.put("segmentCount", group.getValue().size());
 
-                // Get directory from metadata of first entry
+                // Get directory and file type from metadata of first entry
                 Map<String, Object> meta = group.getValue().get(0).metadata;
                 String dir = meta != null ? (String) meta.get("absolute_directory_path") : null;
                 doc.put("directory", dir != null ? dir : "");
+
+                String fileType = meta != null ? (String) meta.get("file_type") : null;
+                doc.put("fileType", fileType != null ? fileType : "");
 
                 documents.add(doc);
             }
@@ -78,5 +102,85 @@ public class DocumentController {
             log.error("List documents error", e);
             ctx.status(500).json(Map.of("error", "Failed to list documents: " + e.getMessage()));
         }
+    }
+
+    /**
+     * 处理目录浏览请求，返回指定路径下的子目录列表。
+     *
+     * <p>请求格式：{@code POST /api/browse}，Body: {@code {"path": "C:/some/dir"}}</p>
+     * <p>当 path 为空时，在 Windows 上返回系统根目录列表（驱动器列表），在 Unix 上返回根目录。</p>
+     * <p>响应格式：</p>
+     * <pre>{@code
+     * {
+     *   "currentPath": "C:/some/dir",
+     *   "parentPath": "C:/some",
+     *   "directories": ["dir1", "dir2", ...]
+     * }
+     * }</pre>
+     */
+    public void handleBrowse(Context ctx) {
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> body = ctx.bodyAsClass(Map.class);
+            String path = (String) body.get("path");
+
+            // If path is empty or null, return root drives (Windows) or root (Unix)
+            if (path == null || path.trim().isEmpty()) {
+                ctx.json(browseRoot());
+                return;
+            }
+
+            File dir = new File(path.trim());
+            if (!dir.exists() || !dir.isDirectory()) {
+                ctx.status(400).json(Map.of("error", "Directory not found: " + path));
+                return;
+            }
+
+            // Get parent path
+            String parentPath = null;
+            if (dir.getParent() != null) {
+                parentPath = dir.getParent();
+            }
+
+            // List subdirectories only
+            File[] subDirs = dir.listFiles(File::isDirectory);
+            List<String> directories = new ArrayList<>();
+            if (subDirs != null) {
+                for (File sub : subDirs) {
+                    directories.add(sub.getAbsolutePath());
+                }
+                directories.sort(String.CASE_INSENSITIVE_ORDER);
+            }
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("currentPath", dir.getAbsolutePath());
+            result.put("parentPath", parentPath);
+            result.put("directories", directories);
+
+            ctx.json(result);
+        } catch (Exception e) {
+            log.error("Browse error", e);
+            ctx.status(500).json(Map.of("error", "Failed to browse directory: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * 浏览根目录，返回系统的根目录列表。
+     * Windows 上返回驱动器列表（C:\、D:\ 等），Unix 上返回 "/"。
+     */
+    private Map<String, Object> browseRoot() {
+        List<String> roots = new ArrayList<>();
+        File[] rootDirs = File.listRoots();
+        if (rootDirs != null) {
+            for (File root : rootDirs) {
+                roots.add(root.getAbsolutePath());
+            }
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("currentPath", "");
+        result.put("parentPath", null);
+        result.put("directories", roots);
+        return result;
     }
 }

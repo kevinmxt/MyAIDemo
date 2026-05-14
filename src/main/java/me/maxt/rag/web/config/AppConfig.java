@@ -4,39 +4,93 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
+/**
+ * 应用配置管理类，负责从 config.json 和环境变量中加载配置。
+ *
+ * <p>配置加载优先级链（后者覆盖前者）：</p>
+ * <ol>
+ *   <li>代码中的默认值</li>
+ *   <li>工作目录下的 config.json 文件</li>
+ *   <li>环境变量（如 {@code RAG_LLM_API_KEY}）</li>
+ * </ol>
+ *
+ * <p>配置分为以下几个部分：LLM 参数、检索参数、文档参数、对话参数、服务器参数、存储参数。</p>
+ *
+ * @since 1.0
+ */
 public class AppConfig {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    // LLM
+    // ========== LLM 配置 ==========
+
+    /** DeepSeek API Key，可通过环境变量 {@code RAG_LLM_API_KEY} 覆盖 */
     private String apiKey;
+
+    /** DeepSeek API 基础地址，可通过环境变量 {@code RAG_LLM_BASE_URL} 覆盖 */
     private String baseUrl;
+
+    /** 模型名称，可通过环境变量 {@code RAG_LLM_MODEL_NAME} 覆盖 */
     private String modelName;
+
+    /** 系统提示词，可通过环境变量 {@code RAG_LLM_SYSTEM_PROMPT} 覆盖 */
     private String systemPrompt;
+
+    /** 模型温度参数（0~1），可通过环境变量 {@code RAG_LLM_TEMPERATURE} 覆盖 */
     private double temperature;
+
+    /** 最大输出 Token 数，可通过环境变量 {@code RAG_LLM_MAX_TOKENS} 覆盖 */
     private int maxTokens;
+
+    /** API 超时秒数，可通过环境变量 {@code RAG_LLM_TIMEOUT} 覆盖 */
     private int timeoutSeconds;
 
-    // Retrieval
+    // ========== 检索参数 ==========
+
+    /** 检索返回的最大结果数，可通过环境变量 {@code RAG_RETRIEVAL_MAX_RESULTS} 覆盖 */
     private int maxResults;
+
+    /** 检索最低相似度阈值（0~1），可通过环境变量 {@code RAG_RETRIEVAL_MIN_SCORE} 覆盖 */
     private double minScore;
 
-    // Document
+    // ========== 文档参数 ==========
+
+    /** 默认文档目录，可通过环境变量 {@code RAG_DOCUMENT_DIR} 覆盖 */
     private String documentDir;
+
+    /** 文档分块大小（字符数），可通过环境变量 {@code RAG_CHUNK_SIZE} 覆盖 */
     private int chunkSize;
+
+    /** 文档分块重叠大小（字符数），可通过环境变量 {@code RAG_CHUNK_OVERLAP} 覆盖 */
     private int chunkOverlap;
 
-    // Chat
+    // ========== 对话参数 ==========
+
+    /** 对话记忆窗口大小（消息数），可通过环境变量 {@code RAG_CHAT_MEMORY_SIZE} 覆盖 */
     private int memorySize;
 
-    // Server
+    // ========== 服务器参数 ==========
+
+    /** HTTP 服务器端口，可通过环境变量 {@code RAG_SERVER_PORT} 覆盖 */
     private int port;
 
-    // Store
+    // ========== 存储参数 ==========
+
+    /** 向量存储文件路径，可通过环境变量 {@code RAG_STORE_PATH} 覆盖 */
     private String storeFilePath;
 
+    // ========== 文档解析参数 ==========
+
+    /** 支持的文件扩展名列表，可通过环境变量 {@code RAG_SUPPORTED_EXTENSIONS}（逗号分隔）覆盖 */
+    private List<String> supportedFileExtensions;
+
+    /**
+     * 使用默认值构造配置实例。
+     */
     public AppConfig() {
         // Set defaults
         this.apiKey = "demo";
@@ -54,8 +108,16 @@ public class AppConfig {
         this.memorySize = 10;
         this.port = 8080;
         this.storeFilePath = "./data/embedding-store.json";
+        this.supportedFileExtensions = Arrays.asList(
+                ".txt", ".pdf", ".docx", ".doc", ".png", ".jpg", ".jpeg",
+                ".md", ".html", ".csv", ".json", ".xlsx", ".pptx");
     }
 
+    /**
+     * 按优先级链加载配置：代码默认 → config.json → 环境变量。
+     *
+     * @return 加载完成的配置实例
+     */
     public static AppConfig load() {
         AppConfig config = new AppConfig();
 
@@ -77,6 +139,9 @@ public class AppConfig {
         return config;
     }
 
+    /**
+     * 从 config.json 解析的 Map 中读取各组配置并应用到实例。
+     */
     @SuppressWarnings("unchecked")
     private static void applyFileConfig(AppConfig config, Map<String, Object> fileConfig) {
         Map<String, Object> llm = (Map<String, Object>) fileConfig.get("llm");
@@ -101,6 +166,16 @@ public class AppConfig {
             config.documentDir = getString(document, "dir", config.documentDir);
             config.chunkSize = getInt(document, "chunkSize", config.chunkSize);
             config.chunkOverlap = getInt(document, "chunkOverlap", config.chunkOverlap);
+
+            // supportedExtensions can be a JSON array or comma-separated string
+            Object extObj = document.get("supportedExtensions");
+            if (extObj instanceof List) {
+                @SuppressWarnings("unchecked")
+                List<String> extList = (List<String>) extObj;
+                config.supportedFileExtensions = extList;
+            } else if (extObj instanceof String) {
+                config.supportedFileExtensions = Arrays.asList(((String) extObj).split(","));
+            }
         }
 
         Map<String, Object> chat = (Map<String, Object>) fileConfig.get("chat");
@@ -119,6 +194,9 @@ public class AppConfig {
         }
     }
 
+    /**
+     * 应用环境变量覆盖配置值。
+     */
     private static void applyEnvOverrides(AppConfig config) {
         config.apiKey = env("RAG_LLM_API_KEY", config.apiKey);
         config.baseUrl = env("RAG_LLM_BASE_URL", config.baseUrl);
@@ -135,6 +213,10 @@ public class AppConfig {
         config.port = envInt("RAG_SERVER_PORT", config.port);
         config.documentDir = env("RAG_DOCUMENT_DIR", config.documentDir);
         config.storeFilePath = env("RAG_STORE_PATH", config.storeFilePath);
+        String extEnv = System.getenv("RAG_SUPPORTED_EXTENSIONS");
+        if (extEnv != null && !extEnv.isEmpty()) {
+            config.supportedFileExtensions = Arrays.asList(extEnv.split(","));
+        }
     }
 
     private static String getString(Map<String, Object> map, String key, String defaultVal) {
@@ -177,7 +259,8 @@ public class AppConfig {
         return defaultVal;
     }
 
-    // Getters
+    // ========== Getters ==========
+
     public String getApiKey() { return apiKey; }
     public String getBaseUrl() { return baseUrl; }
     public String getModelName() { return modelName; }
@@ -193,4 +276,5 @@ public class AppConfig {
     public int getMemorySize() { return memorySize; }
     public int getPort() { return port; }
     public String getStoreFilePath() { return storeFilePath; }
+    public List<String> getSupportedFileExtensions() { return supportedFileExtensions; }
 }

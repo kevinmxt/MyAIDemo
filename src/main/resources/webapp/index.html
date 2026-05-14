@@ -24,8 +24,10 @@
                     <label for="ingestDir">摄入新文档</label>
                     <div class="input-row">
                         <input type="text" id="ingestDir" placeholder="输入文档目录路径...">
+                        <button id="browseBtn" onclick="openBrowser()" title="浏览目录">浏览</button>
                         <button id="ingestBtn" onclick="ingestDocuments()">摄入</button>
                     </div>
+                    <div class="supported-formats" id="supportedFormats"></div>
                     <div id="ingestStatus" class="status-message"></div>
                 </div>
 
@@ -64,6 +66,36 @@
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- Directory Browser Modal -->
+    <div class="modal-overlay" id="browseModal" style="display: none;">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3>选择知识库目录</h3>
+                <button class="modal-close" onclick="closeBrowser()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Breadcrumb navigation -->
+                <div class="breadcrumb" id="browseBreadcrumb"></div>
+                <!-- Directory list -->
+                <div class="dir-list" id="browseDirList">
+                    <div class="empty-state">加载中...</div>
+                </div>
+                <!-- Manual path input -->
+                <div class="manual-path">
+                    <label>或手动输入路径：</label>
+                    <div class="input-row">
+                        <input type="text" id="browseManualPath" placeholder="输入目录路径...">
+                        <button onclick="selectManualPath()">确定</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeBrowser()">取消</button>
+                <button class="btn-confirm" id="browseConfirmBtn" onclick="selectCurrentDir()">选择当前目录</button>
+            </div>
+        </div>
     </div>
 
     <script src="/app.js"></script>

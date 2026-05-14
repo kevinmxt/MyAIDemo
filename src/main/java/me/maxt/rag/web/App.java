@@ -13,10 +13,23 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 
+/**
+ * 本地知识库智能问答 Web 应用入口。
+ *
+ * <p>启动流程：加载配置 → 初始化嵌入存储/文档服务/RAG 服务 → 自动摄入默认文档目录 → 启动 Javalin HTTP 服务器。
+ * 提供 REST API 和静态前端页面。</p>
+ *
+ * @since 1.0
+ */
 public class App {
 
     private static final Logger log = LoggerFactory.getLogger(App.class);
 
+    /**
+     * 应用主入口。
+     *
+     * @param args 命令行参数（暂未使用，所有配置通过 config.json 和环境变量设置）
+     */
     public static void main(String[] args) {
         // Load configuration
         AppConfig config = AppConfig.load();
@@ -25,7 +38,9 @@ public class App {
         // Initialize services
         EmbeddingStoreManager storeManager = new EmbeddingStoreManager(config.getStoreFilePath());
         RAGService ragService = new RAGService(config, storeManager);
-        DocumentService documentService = new DocumentService(storeManager, config.getChunkSize(), config.getChunkOverlap());
+        DocumentService documentService = new DocumentService(
+                storeManager, config.getChunkSize(), config.getChunkOverlap(),
+                config.getSupportedFileExtensions());
 
         // Initialize controllers
         ChatController chatController = new ChatController(ragService);
@@ -55,6 +70,8 @@ public class App {
         app.post("/api/ingest", documentController::handleIngest);
 
         app.get("/api/documents", documentController::handleListDocuments);
+
+        app.post("/api/browse", documentController::handleBrowse);
 
         // Global exception handler
         app.exception(Exception.class, (e, ctx) -> {

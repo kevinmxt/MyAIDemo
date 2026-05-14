@@ -22,6 +22,20 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * RAG 核心服务，负责检索增强生成（RAG）流程的编排。
+ *
+ * <p>主要功能：</p>
+ * <ol>
+ *   <li>使用本地 ONNX 嵌入模型（BgeSmallEnV15）将查询向量化</li>
+ *   <li>通过 {@link EmbeddingStoreContentRetriever} 从向量库中检索最相关的文档片段</li>
+ *   <li>将检索到的上下文片段注入 LLM 对话，生成增强后的答案</li>
+ * </ol>
+ *
+ * <p>对话记忆基于 {@link MessageWindowChatMemory}，窗口大小由 {@link AppConfig#getMemorySize()} 配置。</p>
+ *
+ * @since 1.0
+ */
 public class RAGService {
 
     private final AppConfig config;
@@ -31,6 +45,12 @@ public class RAGService {
     private final ContentRetriever contentRetriever;
     private final Assistant assistant;
 
+    /**
+     * 创建 RAG 服务实例，初始化嵌入模型、聊天模型、内容检索器和 AI 助手。
+     *
+     * @param config       应用配置
+     * @param storeManager 嵌入存储管理器
+     */
     public RAGService(AppConfig config, EmbeddingStoreManager storeManager) {
         this.config = config;
         this.storeManager = storeManager;
@@ -59,10 +79,24 @@ public class RAGService {
                 .build();
     }
 
+    /**
+     * 根据用户问题生成回答（不含来源引用）。
+     *
+     * @param query 用户问题
+     * @return AI 生成的回答文本
+     */
     public String answer(String query) {
         return assistant.answer(query);
     }
 
+    /**
+     * 根据用户问题生成回答，并附带检索到的文档来源。
+     *
+     * <p>该方法会先手动执行向量检索以获取来源信息，再通过 AI 助手生成回答。</p>
+     *
+     * @param query 用户问题
+     * @return 包含回答文本和来源列表的结果对象
+     */
     public AnswerWithSources answerWithSources(String query) {
         // Retrieve relevant sources manually
         List<Source> sources = new ArrayList<>();
@@ -94,8 +128,13 @@ public class RAGService {
         return new AnswerWithSources(answer, sources);
     }
 
+    /**
+     * 带来源引用的回答结果 DTO。
+     */
     public static class AnswerWithSources {
+        /** AI 生成的回答文本 */
         public String answer;
+        /** 检索到的参考来源列表 */
         public List<Source> sources;
 
         public AnswerWithSources(String answer, List<Source> sources) {
@@ -104,9 +143,15 @@ public class RAGService {
         }
     }
 
+    /**
+     * 检索来源 DTO，表示一个与查询相关的文档片段。
+     */
     public static class Source {
+        /** 来源文件名（含路径） */
         public String fileName;
+        /** 来源文本内容 */
         public String text;
+        /** 相似度分数（0~1） */
         public double score;
 
         public Source(String fileName, String text, double score) {

@@ -1,0 +1,266 @@
+# MyAIDemo2 - 本地知识库智能问答系统
+
+基于 LangChain4j + DeepSeek + Javalin 的本地知识库智能问答系统，支持多模态文档索引和检索增强生成（RAG）。
+
+## 项目简介
+
+本系统可以将本地文档目录中的多格式文件（TXT、PDF、DOCX、PNG 等）自动分块、向量化并存入本地向量数据库。用户通过 Web 界面输入自然语言问题，系统会检索最相关的文档片段，结合大语言模型生成精准回答，并附上参考来源。
+
+## 技术栈
+
+| 组件 | 技术 |
+|------|------|
+| Web 框架 | Javalin 6.x（内嵌 Jetty） |
+| AI 框架 | LangChain4j 1.12.1 |
+| LLM | DeepSeek v4-flash（OpenAI 兼容 API） |
+| 嵌入模型 | BgeSmallEnV15（本地 ONNX 推理，无需 GPU） |
+| 文档解析 | Apache Tika 3.x（支持 PDF/DOCX/PNG 等多模态） |
+| 向量存储 | 内存 + JSON 文件持久化 |
+| 前端 | 纯 HTML/CSS/JS（SPA） |
+| 打包 | Maven Shade Plugin（Fat JAR） |
+
+## 功能特性
+
+- **多模态文档支持** — TXT、PDF、DOCX、DOC、PNG、JPG、Markdown、HTML、CSV、JSON、XLSX、PPTX
+- **目录浏览选择** — Web 界面内置目录浏览器，可视化选择知识库目录
+- **自动分块与向量化** — 文档自动递归分块，本地 ONNX 模型生成嵌入向量
+- **向量数据持久化** — 向量和元数据以 JSON 格式原子写入磁盘，重启后自动恢复
+- **RAG 智能问答** — 基于检索增强生成的智能问答，答案附带参考来源
+- **可配置参数** — 通过 config.json 和环境变量灵活配置所有参数
+- **支持中文对话** — 系统提示词为中文，对话体验友好
+- **对话记忆** — 基于滑动窗口的多轮对话上下文
+
+## 环境要求
+
+- **JDK 17+**
+- **Maven 3.6+**
+- （可选）**Tesseract OCR** — 如需从 PNG/JPG 等图像中提取文字，需要系统安装 Tesseract
+
+## 快速开始
+
+### 1. 配置
+
+在项目根目录创建 `config.json`（可参考 `config.example.json`）：
+
+```json
+{
+  "llm": {
+    "apiKey": "你的DeepSeek-API-Key",
+    "baseUrl": "https://api.deepseek.com",
+    "modelName": "deepseek-v4-flash"
+  },
+  "document": {
+    "dir": "./documents",
+    "chunkSize": 300,
+    "chunkOverlap": 0,
+    "supportedExtensions": [".txt", ".pdf", ".docx", ".doc", ".png", ".jpg", ".jpeg", ".md", ".html", ".csv", ".json", ".xlsx", ".pptx"]
+  }
+}
+```
+
+也可通过环境变量配置（环境变量优先级高于 config.json）：
+
+```bash
+export RAG_LLM_API_KEY="你的API-Key"
+export RAG_LLM_MODEL_NAME="deepseek-v4-flash"
+export RAG_DOCUMENT_DIR="./my-docs"
+export RAG_SERVER_PORT=8080
+```
+
+### 2. 构建
+
+```bash
+mvn clean package
+```
+
+构建产物位于 `target/MyAIDemo2-1.0-SNAPSHOT.jar`（Fat JAR，包含所有依赖）。
+
+### 3. 运行
+
+```bash
+java -jar target/MyAIDemo2-1.0-SNAPSHOT.jar
+```
+
+启动后访问 `http://localhost:8080`。
+
+首次启动时，如果 `document.dir` 配置的目录存在且有支持格式的文件，系统会自动摄入。
+
+### 4. 使用
+
+1. 在左侧面板的"摄入新文档"区域，点击**浏览**按钮选择文档目录，或直接输入路径，点击**摄入**
+2. 摄入完成后，下方"已索引文档"列表中会显示所有文档及其片段数
+3. 在右侧聊天区域输入问题，按 Enter 发送
+4. 系统会根据知识库内容生成回答，并附上参考来源
+
+## 配置说明
+
+### config.json 字段
+
+| 路径 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `llm.apiKey` | string | `"demo"` | DeepSeek API Key |
+| `llm.baseUrl` | string | `"https://api.deepseek.com"` | API 基础地址 |
+| `llm.modelName` | string | `"deepseek-v4-flash"` | 模型名称 |
+| `llm.systemPrompt` | string | 中文助手提示词 | 系统提示词 |
+| `llm.temperature` | number | `0.7` | 模型温度 (0~1) |
+| `llm.maxTokens` | number | `4096` | 最大输出 Token |
+| `llm.timeoutSeconds` | number | `120` | API 超时秒数 |
+| `retrieval.maxResults` | number | `3` | 检索最大结果数 |
+| `retrieval.minScore` | number | `0.5` | 检索最低相似度 |
+| `document.dir` | string | `"./documents"` | 默认文档目录 |
+| `document.chunkSize` | number | `300` | 分块大小（字符） |
+| `document.chunkOverlap` | number | `0` | 分块重叠大小 |
+| `document.supportedExtensions` | array/string | 13种格式 | 支持的文件扩展名 |
+| `chat.memorySize` | number | `10` | 对话记忆窗口（消息数） |
+| `server.port` | number | `8080` | HTTP 服务端口 |
+| `store.filePath` | string | `"./data/embedding-store.json"` | 向量存储文件 |
+
+### 环境变量
+
+| 环境变量 | 对应配置 |
+|----------|----------|
+| `RAG_LLM_API_KEY` | `llm.apiKey` |
+| `RAG_LLM_BASE_URL` | `llm.baseUrl` |
+| `RAG_LLM_MODEL_NAME` | `llm.modelName` |
+| `RAG_LLM_SYSTEM_PROMPT` | `llm.systemPrompt` |
+| `RAG_LLM_TEMPERATURE` | `llm.temperature` |
+| `RAG_LLM_MAX_TOKENS` | `llm.maxTokens` |
+| `RAG_LLM_TIMEOUT` | `llm.timeoutSeconds` |
+| `RAG_RETRIEVAL_MAX_RESULTS` | `retrieval.maxResults` |
+| `RAG_RETRIEVAL_MIN_SCORE` | `retrieval.minScore` |
+| `RAG_CHUNK_SIZE` | `document.chunkSize` |
+| `RAG_CHUNK_OVERLAP` | `document.chunkOverlap` |
+| `RAG_CHAT_MEMORY_SIZE` | `chat.memorySize` |
+| `RAG_SERVER_PORT` | `server.port` |
+| `RAG_DOCUMENT_DIR` | `document.dir` |
+| `RAG_STORE_PATH` | `store.filePath` |
+| `RAG_SUPPORTED_EXTENSIONS` | `document.supportedExtensions`（逗号分隔） |
+
+## API 文档
+
+### `GET /api/health`
+
+健康检查。
+
+**响应：**
+```json
+{"status": "ok"}
+```
+
+### `POST /api/chat`
+
+发送对话消息。
+
+**请求：**
+```json
+{"query": "这份文档的主要内容是什么？"}
+```
+
+**响应：**
+```json
+{
+  "answer": "这份文档主要介绍了...",
+  "sources": [
+    {
+      "fileName": "report.pdf",
+      "text": "文档中的相关片段文本...",
+      "score": 0.95
+    }
+  ]
+}
+```
+
+### `POST /api/ingest`
+
+摄入指定目录的文档。
+
+**请求：**
+```json
+{"directory": "/path/to/documents"}
+```
+
+**响应：**
+```json
+{
+  "success": true,
+  "filesProcessed": 3,
+  "segmentsCreated": 45,
+  "message": "Successfully processed 3 files, created 45 segments."
+}
+```
+
+### `GET /api/documents`
+
+获取已索引的文档列表。
+
+**响应：**
+```json
+[
+  {
+    "fileName": "report.pdf",
+    "segmentCount": 15,
+    "directory": "/path/to/documents",
+    "fileType": "PDF"
+  }
+]
+```
+
+### `POST /api/browse`
+
+浏览文件系统目录。
+
+**请求：**
+```json
+{"path": "C:/Users"}
+```
+path 为空时返回根目录（Windows 返回驱动器列表）。
+
+**响应：**
+```json
+{
+  "currentPath": "C:/Users",
+  "parentPath": "C:/",
+  "directories": ["C:/Users/Admin", "C:/Users/Public", "C:/Users/Default"]
+}
+```
+
+## 项目结构
+
+```
+MyAIDemo2/
+├── config.example.json              # 配置文件模板
+├── pom.xml                          # Maven 构建配置
+├── README.md
+└── src/main/
+    ├── java/
+    │   ├── shared/
+    │   │   ├── Assistant.java       # AI 服务接口
+    │   │   └── Utils.java           # 工具类
+    │   └── me/maxt/rag/
+    │       ├── Easy_RAG_Example2.java
+    │       ├── Naive_RAG_Example.java
+    │       └── web/
+    │           ├── App.java         # 应用入口
+    │           ├── config/
+    │           │   └── AppConfig.java          # 配置管理
+    │           ├── controller/
+    │           │   ├── ChatController.java     # 对话 API
+    │           │   └── DocumentController.java # 文档管理 API
+    │           └── service/
+    │               ├── DocumentService.java       # 文档摄入服务
+    │               ├── EmbeddingStoreManager.java # 向量存储管理
+    │               └── RAGService.java            # RAG 核心服务
+    └── resources/
+        └── webapp/
+            ├── index.html           # 前端页面
+            ├── style.css            # 样式表
+            └── app.js               # 前端逻辑
+```
+
+## 注意事项
+
+1. **OCR 支持**：PNG/JPG 图像文件的文字提取依赖 Tesseract OCR。如果没有安装 Tesseract，图像文件会被静默跳过（不会报错）。Windows 上可通过 [UB-Mannheim/tesseract](https://github.com/UB-Mannheim/tesseract/wiki) 安装。
+2. **嵌入模型**：首次启动时，BgeSmallEnV15 ONNX 模型会自动下载到本地缓存（约 100MB）。
+3. **内存使用**：向量数据存储在内存中，同时持久化到 JSON 文件。大规模文档集（10万+ 片段）建议迁移到外部向量数据库。
+4. **API Key**：默认 API Key 为 `"demo"`，生产环境请通过环境变量 `RAG_LLM_API_KEY` 配置真实 Key。
+5. **端口冲突**：默认端口 8080，可通过 `config.json` 或 `RAG_SERVER_PORT` 环境变量修改。

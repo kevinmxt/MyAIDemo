@@ -8,6 +8,13 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 
+/**
+ * 对话控制器，处理用户的问答请求。
+ *
+ * <p>接收用户的自然语言问题，通过 {@link RAGService} 执行检索增强生成，返回答案及参考来源。</p>
+ *
+ * @since 1.0
+ */
 public class ChatController {
 
     private static final Logger log = LoggerFactory.getLogger(ChatController.class);
@@ -15,10 +22,21 @@ public class ChatController {
 
     private final RAGService ragService;
 
+    /**
+     * @param ragService RAG 核心服务
+     */
     public ChatController(RAGService ragService) {
         this.ragService = ragService;
     }
 
+    /**
+     * 处理对话请求。
+     *
+     * <p>请求格式：{@code POST /api/chat}，Body: {@code {"query": "用户问题"}}</p>
+     * <p>响应格式：{@code {"answer": "回答文本", "sources": [{"fileName": "...", "text": "...", "score": 0.95}]}}</p>
+     *
+     * @param ctx Javalin HTTP 上下文
+     */
     public void handleChat(Context ctx) {
         try {
             @SuppressWarnings("unchecked")
