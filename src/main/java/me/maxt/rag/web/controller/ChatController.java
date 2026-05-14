@@ -13,6 +13,7 @@ import java.util.Map;
  *
  * <p>接收用户的自然语言问题，通过 {@link RAGService} 执行检索增强生成，返回答案及参考来源。</p>
  *
+ * @author maxt
  * @since 1.0
  */
 public class ChatController {

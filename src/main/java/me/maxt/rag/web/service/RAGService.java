@@ -34,6 +34,7 @@ import java.util.List;
  *
  * <p>对话记忆基于 {@link MessageWindowChatMemory}，窗口大小由 {@link AppConfig#getMemorySize()} 配置。</p>
  *
+ * @author maxt
  * @since 1.0
  */
 public class RAGService {
@@ -137,6 +138,12 @@ public class RAGService {
         /** 检索到的参考来源列表 */
         public List<Source> sources;
 
+        /**
+         * 构造带来源引用的回答结果。
+         *
+         * @param answer AI 生成的回答文本
+         * @param sources 检索到的参考来源列表
+         */
         public AnswerWithSources(String answer, List<Source> sources) {
             this.answer = answer;
             this.sources = sources;
@@ -154,6 +161,13 @@ public class RAGService {
         /** 相似度分数（0~1） */
         public double score;
 
+        /**
+         * 构造检索来源。
+         *
+         * @param fileName 来源文件名（含路径）
+         * @param text 来源文本内容
+         * @param score 相似度分数（0~1）
+         */
         public Source(String fileName, String text, double score) {
             this.fileName = fileName;
             this.text = text;

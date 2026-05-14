@@ -10,6 +10,8 @@ import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.embedding.onnx.bgesmallenv15q.BgeSmallEnV15QuantizedEmbeddingModel;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -23,6 +25,7 @@ import java.util.List;
  * <p>支持的文件格式由 {@code supportedExtensions} 配置决定，默认为 TXT、PDF、DOCX、PNG 等常见格式。
  * 文档解析基于 Apache Tika，可自动识别 MIME 类型并选择合适的解析器。</p>
  *
+ * @author maxt
  * @since 1.0
  */
 public class DocumentService {
@@ -32,6 +35,7 @@ public class DocumentService {
     private final int chunkSize;
     private final int chunkOverlap;
     private final List<String> supportedExtensions;
+    private static final Logger log = LoggerFactory.getLogger(DocumentService.class);
 
     /**
      * 创建文档服务实例。
@@ -110,7 +114,7 @@ public class DocumentService {
                 filesProcessed++;
                 totalSegments += segments.size();
             } catch (Exception e) {
-                System.err.println("Failed to process file: " + file.getName() + " - " + e.getMessage());
+                log.error("Failed to process file: {}", file.getName(), e);
             }
         }
 
@@ -147,6 +151,13 @@ public class DocumentService {
         public int segmentsCreated;
         public String message;
 
+        /**
+         * 构造摄入结果。
+         *
+         * @param filesProcessed 处理的文件数
+         * @param segmentsCreated 创建的分段数
+         * @param message 状态消息
+         */
         public IngestResult(int filesProcessed, int segmentsCreated, String message) {
             this.success = filesProcessed > 0;
             this.filesProcessed = filesProcessed;

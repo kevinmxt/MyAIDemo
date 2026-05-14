@@ -8,12 +8,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
  * 文档管理控制器，处理文档摄入、浏览和列表相关的 HTTP 请求。
  *
+ * @author maxt
  * @since 1.0
  */
 public class DocumentController {
@@ -38,6 +42,8 @@ public class DocumentController {
      *
      * <p>请求格式：{@code POST /api/ingest}，Body: {@code {"directory": "/path/to/docs"}}</p>
      * <p>响应格式：{@code {"success": true, "filesProcessed": 3, "segmentsCreated": 45, "message": "..."}}</p>
+     *
+     * @param ctx Javalin HTTP 上下文
      */
     public void handleIngest(Context ctx) {
         try {
@@ -67,6 +73,8 @@ public class DocumentController {
      *
      * <p>请求格式：{@code GET /api/documents}</p>
      * <p>响应格式：JSON 数组，每个元素包含 {@code fileName}、{@code segmentCount}、{@code directory}</p>
+     *
+     * @param ctx Javalin HTTP 上下文
      */
     public void handleListDocuments(Context ctx) {
         try {
@@ -117,6 +125,8 @@ public class DocumentController {
      *   "directories": ["dir1", "dir2", ...]
      * }
      * }</pre>
+     *
+     * @param ctx Javalin HTTP 上下文
      */
     public void handleBrowse(Context ctx) {
         try {

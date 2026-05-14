@@ -19,6 +19,7 @@ import java.util.Map;
  * <p>启动流程：加载配置 → 初始化嵌入存储/文档服务/RAG 服务 → 自动摄入默认文档目录 → 启动 Javalin HTTP 服务器。
  * 提供 REST API 和静态前端页面。</p>
  *
+ * @author maxt
  * @since 1.0
  */
 public class App {

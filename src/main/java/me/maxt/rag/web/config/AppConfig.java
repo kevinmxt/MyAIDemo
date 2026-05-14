@@ -1,6 +1,8 @@
 package me.maxt.rag.web.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -20,11 +22,13 @@ import java.util.Map;
  *
  * <p>配置分为以下几个部分：LLM 参数、检索参数、文档参数、对话参数、服务器参数、存储参数。</p>
  *
+ * @author maxt
  * @since 1.0
  */
 public class AppConfig {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final Logger log = LoggerFactory.getLogger(AppConfig.class);
 
     // ========== LLM 配置 ==========
 
@@ -129,7 +133,7 @@ public class AppConfig {
                 Map<String, Object> fileConfig = MAPPER.readValue(configFile, Map.class);
                 applyFileConfig(config, fileConfig);
             } catch (IOException e) {
-                System.err.println("Warning: Failed to parse config.json, using defaults. " + e.getMessage());
+                log.warn("Failed to parse config.json, using defaults.", e);
             }
         }
 
@@ -261,20 +265,36 @@ public class AppConfig {
 
     // ========== Getters ==========
 
+    /** @return DeepSeek API Key */
     public String getApiKey() { return apiKey; }
+    /** @return DeepSeek API 基础地址 */
     public String getBaseUrl() { return baseUrl; }
+    /** @return 模型名称 */
     public String getModelName() { return modelName; }
+    /** @return 系统提示词 */
     public String getSystemPrompt() { return systemPrompt; }
+    /** @return 模型温度参数（0~1） */
     public double getTemperature() { return temperature; }
+    /** @return 最大输出 Token 数 */
     public int getMaxTokens() { return maxTokens; }
+    /** @return API 超时秒数 */
     public int getTimeoutSeconds() { return timeoutSeconds; }
+    /** @return 检索返回的最大结果数 */
     public int getMaxResults() { return maxResults; }
+    /** @return 检索最低相似度阈值（0~1） */
     public double getMinScore() { return minScore; }
+    /** @return 默认文档目录路径 */
     public String getDocumentDir() { return documentDir; }
+    /** @return 文档分块大小（字符数） */
     public int getChunkSize() { return chunkSize; }
+    /** @return 文档分块重叠大小（字符数） */
     public int getChunkOverlap() { return chunkOverlap; }
+    /** @return 对话记忆窗口大小（消息数） */
     public int getMemorySize() { return memorySize; }
+    /** @return HTTP 服务器端口 */
     public int getPort() { return port; }
+    /** @return 向量存储文件路径 */
     public String getStoreFilePath() { return storeFilePath; }
+    /** @return 支持的文件扩展名列表 */
     public List<String> getSupportedFileExtensions() { return supportedFileExtensions; }
 }

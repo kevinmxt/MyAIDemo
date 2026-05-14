@@ -2,6 +2,8 @@ package me.maxt.rag.web.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
@@ -29,11 +31,13 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>线程安全：所有写操作（add/addAll/removeAll）均使用 {@code synchronized} 方法保护。</p>
  *
+ * @author maxt
  * @since 1.0
  */
 public class EmbeddingStoreManager {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final Logger log = LoggerFactory.getLogger(EmbeddingStoreManager.class);
 
     /** 持久化文件路径 */
     private final Path storePath;
@@ -59,9 +63,9 @@ public class EmbeddingStoreManager {
         if (file.exists()) {
             try {
                 loadFromFile();
-                System.out.println("Loaded embedding store from: " + storePath + " (" + entries.size() + " entries)");
+                log.info("Loaded embedding store from: {} ({} entries)", storePath, entries.size());
             } catch (IOException e) {
-                System.err.println("Failed to load embedding store: " + e.getMessage() + ". Starting fresh.");
+                log.warn("Failed to load embedding store, starting fresh.", e);
             }
         }
     }
@@ -162,7 +166,7 @@ public class EmbeddingStoreManager {
             MAPPER.writerWithDefaultPrettyPrinter().writeValue(tempPath.toFile(), entries);
             Files.move(tempPath, storePath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (IOException e) {
-            System.err.println("Failed to persist embedding store: " + e.getMessage());
+            log.error("Failed to persist embedding store.", e);
         }
     }
 
@@ -204,8 +208,16 @@ public class EmbeddingStoreManager {
         /** 元数据（如文件名、目录路径等） */
         public Map<String, Object> metadata;
 
+        /** 默认构造函数（用于 JSON 反序列化）。 */
         public StoredEntry() {}
 
+        /**
+         * 构造存储条目。
+         *
+         * @param embedding 嵌入向量数组
+         * @param text 文本内容
+         * @param metadata 元数据映射
+         */
         public StoredEntry(float[] embedding, String text, Map<String, Object> metadata) {
             this.embedding = embedding;
             this.text = text;
